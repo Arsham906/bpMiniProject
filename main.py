@@ -1,0 +1,415 @@
+import os
+import datetime
+from cryptography.fernet import Fernet
+import json
+import inquirer
+from getpass import getpass
+
+PROFILE = "profile.txt"
+
+def encryptFile(path, key):
+    f = Fernet(key)
+    with open(path, 'rb') as fr:
+        oCon = fr.read()
+    eCon = f.encrypt(oCon)
+    with open(path, 'wb') as fwb:
+        fwb.write(eCon)
+
+def decryptFile(path, key):
+    f = Fernet(key)
+    with open(path, 'rb') as fr:
+        eCon = fr.read()
+    dCon = f.decrypt(eCon)
+    with open(path, 'wb') as fw:
+        fw.write(dCon)
+
+def getUserFiles(u, notes: bool, label: bool):
+    tmpN = ''
+    tmpL = ''
+    if notes:
+        tmpN = u.capitalize() + '/' + u + '.txt'
+    if label:
+        tmpL = u.capitalize() + '/' + u + 'label.txt'
+    return [tmpN, tmpL]
+
+def isInteger(s):
+    for c in s:
+        if not (ord(c) >= ord('0') and ord(c) <= ord('9')):
+            return False
+    return True
+
+def signUp(u, p):
+    key = Fernet.generate_key()
+    f = open(PROFILE, 'a')
+    f.write(u + " | " +  p + " | " + key.decode('utf-8') + '\n')
+    f.close()
+    return key
+
+# -1: bad error / 0: no account / key: account was found
+def login(u, p):
+    try:
+        with open(PROFILE, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                tmp = line.split('|')
+                if tmp[0].strip() == u and tmp[1].strip() == p:
+                    key = tmp[2].strip().encode('utf-8')
+                    return key
+            return 0
+    except FileNotFoundError:
+        return 0
+        
+    return -1
+
+def readNotes(user, key):
+    path = getUserFiles(user, True, False)[0]
+    try:
+        decryptFile(path, key)
+    except:
+        pass
+    try:
+        with open(path, 'r') as fr:
+            notes = []
+            tmp = fr.read().strip('=')
+            notes = json.loads(tmp)
+            encryptFile(path, key)
+            return notes
+    except:
+        try:
+            encryptFile(path, key)
+        except:
+            pass
+        return []
+
+# new list of notes: success / 0: faliure
+def _addNote(user, key, notes: list, note: str, label = None):
+    path = getUserFiles(user, True, False)[0]
+    try:
+        decryptFile(path, key)
+    except:
+        if not os.path.isdir(user.capitalize()):
+            os.mkdir(user.capitalize())
+        f = open(path, 'w')
+        f.close()
+    try:
+        with open(path, 'w') as fw:
+            tmpDict = {"label": label, "note": note, "timeStamp": str(datetime.datetime.now())}
+            notes.append(tmpDict)
+            json.dump(notes, fw)
+        encryptFile(path, key)
+        return notes
+    except:
+        try:
+            encryptFile(path, key)
+        except:
+            pass
+        return 0
+    
+def seeNoteBylabel(user, key, label: list):
+    path = getUserFiles(user, True, False)[0]
+    try:
+        decryptFile(path, key)
+    except:
+        pass
+    try:
+        with open(path, 'r') as fr:
+            tmp = fr.read().strip('=')
+            notes = json.loads(tmp)
+            chosenNotes = []
+            for note in notes:
+                if note["label"] in label:
+                    chosenNotes.append(note)
+            encryptFile(path, key)
+            return chosenNotes
+    except:
+        try:
+            encryptFile(path, key)
+        except:
+            pass
+        return 0
+    
+def showNote(note, timeStamp = True):
+    label = note["label"]
+    context = note["note"]
+    print("_ ", end='')
+    if label != None:
+        print(label)
+    for i in range(len(context)):
+        if i == len(context) - 1:
+            print(context[i], end='')
+            break
+        print(context[i])
+    if timeStamp:
+        time = note["timeStamp"]
+        print(time)
+    else:
+        print()
+
+def _deleteNote(notes, idx):
+    while idx < len(notes) - 1:
+        notes[idx] = notes[idx + 1]
+        idx += 1
+    deletedNote = notes.pop(idx)
+    path = getUserFiles(user, True, False)[0]
+    try:
+        decryptFile(path, key)
+    except:
+        if not os.path.isdir(user.capitalize()):
+            os.mkdir(user.capitalize())
+        f = open(path, 'w')
+        f.close()
+    try:
+        with open(path, 'w') as fw:
+            json.dump(notes, fw)
+        encryptFile(path, key)
+        return deletedNote
+    except:
+        try:
+            encryptFile(path, key)
+        except:
+            pass
+        return 0
+
+# 1: success / 0: failure
+def _changeNote(user, key, notes, idx, note):
+    prvNote = _deleteNote(notes, idx)
+    anErr = _addNote(user, key, notes, note, prvNote["label"])
+    try:
+        if anErr == 0:
+            return 0
+        else:
+            return 1
+    except:
+        return 1
+
+def _addlabel(user, key, notes, idx, note, label):
+    _deleteNote(notes, idx)
+    anErr = _addNote(user, key, notes, note, label)
+    try:
+        if anErr == 0:
+            return 0
+    except:
+        return 1
+
+def readFile(u, key, islabel: bool):
+    if not islabel:
+        tmp = getUserFiles(u, True, False)[0]
+    else:
+        tmp = getUserFiles(u, False, True)[1]
+
+    exits = os.path.isfile(tmp)
+    if exits:
+        decryptFile(tmp, key)
+        f = open(tmp, 'r')
+        lines = f.read()
+        f.close()
+        encryptFile(tmp, key)
+        return lines
+    return False
+
+def addlabelToFile(u, key, label):
+    # tmp = u + "labels.txt"
+    tmp = getUserFiles(u, False, True)[1]
+    exits = os.path.isfile(tmp)
+    if not exits:
+        if not os.path.isdir(u.capitalize()):
+            os.mkdir(u.capitalize())
+        f = open(getUserFiles(u, False, True)[1], 'w')
+        encryptFile(tmp, key)
+        f.close()
+    try:
+        decryptFile(tmp, key)
+        with open(tmp, 'rt') as fr:
+            lExits = False
+            lines = fr.readlines()
+            for line in lines:
+                if line == label + '\n':
+                    lExits = True      
+            if not lExits:
+                with open(tmp, 'w') as fw:
+                    for l in lines:
+                        fw.write(l)
+                    fw.write(label + '\n')
+        encryptFile(tmp, key)
+    except:
+        print("addlabel ERROR!")
+        return -1
+        
+    return 0
+
+# -1: no such file / 0: no such string / 1: string found
+def strIsInFile(fileName, key, string):
+    try:
+        decryptFile(fileName, key)
+        with open(fileName, 'r') as fr:
+            lines = fr.readlines()
+            for line in lines:
+                r = line.find(string)
+                if r != -1:
+                    encryptFile(fileName, key)
+                    return 1
+        encryptFile(fileName, key)
+        return 0
+    except FileNotFoundError:
+        try:
+            encryptFile(fileName, key)
+        except:
+            pass
+        return -1
+
+ls = input("login(l)/signUp(s): ")
+F = True
+user = ''
+pas = ''
+
+while F:
+    if ls.lower() == 's':
+        user = input("username: ")
+        pas = getpass("password: ")
+        key = signUp(user, pas)
+        F = False
+    elif ls.lower() == 'l':
+        user = input("username: ")
+        pas = getpass("password: ")
+        key = login(user, pas)
+        if type(key) == bytes:
+            notes = readNotes(user, key)
+            F = False
+        else:
+            print("...username/passwrod was wrong")
+    else:
+        ls = input("login(l)/signUp(s): ")
+
+cmdList = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
+cmd = 0
+F = True
+while F:
+    if cmd != 0:
+        tmp = input("press ENTER to proceed...")
+            
+    cmd = inquirer.list_input("Options:", choices=cmdList)
+
+    if cmd == cmdList[5]:
+        F = False
+    if cmd == cmdList[0]:
+        notes = readNotes(user, key)
+        if len(notes) == 0:
+            print("no notes yet...")
+        else:
+            llabels = readFile(user, key, True)
+            if not llabels:
+                print("no labels yet...")
+            else:
+                print("labels: ")
+                print(llabels)
+
+            which = input("wich notes(label name / all): ")
+            if which == 'all':
+                for note in notes:
+                    showNote(note)
+            else:
+                chosenNotes = seeNoteBylabel(user, key, [which])
+                if len(chosenNotes) == 0:
+                    print("no note with such label...")
+                else:
+                    for note in chosenNotes:
+                        showNote(note)
+
+    if cmd == cmdList[3]:
+        tmp = input("add thy note: ")
+        n = []
+        n.append(tmp)
+        while True:
+            tmp = input()
+            if tmp == '':
+                break
+            n.append(tmp)
+        _addNote(user, key, notes, n)
+        lab = input("label(press enter if no labels): ")
+        if len(lab) == 0:
+            lab = None
+        else:
+            addlabelToFile(user, key, lab)
+            _addlabel(user, key, notes, len(notes) - 1, notes[len(notes) - 1]["note"], lab)
+
+    if cmd == cmdList[2]:
+        noteList = readNotes(user, key)
+        for i in range(len(noteList)):
+            print(i, end='')
+            showNote(notes[i])
+        
+        while True:
+            try:
+                l = int(input("which note do you want to delete? "))
+                break
+            except:
+                print("...ENTER A NUMBER!")
+        notes = _deleteNote(notes, l)
+        if notes == 0:
+            print("...note was not deleted")
+        else:
+            print("note deleted...")
+        
+    if cmd == cmdList[1]:
+        for i in range(len(notes)):
+            print(i, end='')
+            showNote(notes[i])
+        
+        while True:
+            try:
+                nNum = int(input("which note do you wanna change? "))
+                break
+            except:
+                print("...ENTER A NUMBER!")
+
+        tmp = input("new note: ")
+        note = []
+        note.append(tmp)
+        while True:
+            tmp = input()
+            if tmp == '':
+                break
+            note.append(tmp)
+        
+        cnErr = _changeNote(user, key, notes, nNum, note)
+        if not cnErr:
+            print("...couldn't change note")
+        else:
+            print("note changed...")
+            
+    if cmd == cmdList[4]:
+        labels = readFile(user, key, True)
+        if labels:
+            print("labels:")
+            print(labels)
+        else:
+            print("No labels yet...")
+        label = input("label name: ")
+        isIn = True
+        while True and isIn:
+            isl = input("do you wanna also add it to a note?(y/n/q(uit)) ")
+            lNumL = []
+            if isl.lower() == 'y':
+                for i in range(len(notes)):
+                    print(i, end='')
+                    showNote(notes[i])
+
+                while True:
+                    tmp = input("note number(q to exit): ")
+                    if tmp.lower() == 'q':
+                        isIn = False
+                        break   
+                    lNumL.append(int(tmp))
+                for ln in lNumL:
+                    addlabelToFile(user, key, label)
+                    _addlabel(user, key, notes, ln, notes[ln]["note"], label)
+            elif isl.lower() == 'n':
+                if strIsInFile(getUserFiles(user, False, True)[1], key, label) > 0:
+                    print("already exists...")
+                    break
+                addlabelToFile(user, key, label)
+                print("new label created...")
+                break
+            elif isl.lower() == 'q':
+                break       
+        
