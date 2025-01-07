@@ -4,8 +4,15 @@ from cryptography.fernet import Fernet
 import json
 import inquirer
 from getpass import getpass
+import curses
 
 PROFILE = "profile.txt"
+
+def less(stdscr):
+    stdscr.clear()
+    stdscr.addstr("notes...")
+    stdscr.refresh()
+    stdscr.getch()
 
 def encryptFile(path, key):
     f = Fernet(key)
@@ -145,6 +152,7 @@ def showNote(note, timeStamp = True):
     else:
         print()
 
+# deleted note: success / 0: failure
 def _deleteNote(notes, idx):
     while idx < len(notes) - 1:
         notes[idx] = notes[idx + 1]
@@ -256,6 +264,146 @@ def strIsInFile(fileName, key, string):
         except:
             pass
         return -1
+    
+def viewHandle():
+    notes = readNotes(user, key)
+    if len(notes) == 0:
+        print("no notes yet...")
+    else:
+        llabels = readFile(user, key, True)
+        if not llabels:
+            print("no labels yet...")
+        else:
+            print("labels: ")
+            print(llabels)
+
+        which = input("wich notes(label name / all): ")
+        if which == 'all':
+            for note in notes:
+                showNote(note)
+        else:
+            chosenNotes = seeNoteBylabel(user, key, [which])
+            if len(chosenNotes) == 0:
+                print("no note with such label...")
+            else:
+                for note in chosenNotes:
+                    showNote(note)
+
+def addHandle():
+    tmp = input("add thy note: ")
+    n = []
+    n.append(tmp)
+    while True:
+        tmp = input()
+        if tmp == '':
+            break
+        n.append(tmp)
+    _addNote(user, key, notes, n)
+    lab = input("label(press enter if no labels): ")
+    if len(lab) == 0:
+        lab = None
+    else:
+        addlabelToFile(user, key, lab)
+        _addlabel(user, key, notes, len(notes) - 1, notes[len(notes) - 1]["note"], lab)
+
+def deleteHandle():
+    for i in range(len(notes)):
+        print(i, end='')
+        showNote(notes[i])
+    
+    while True:
+        try:
+            l = int(input("which note do you want to delete? "))
+            break
+        except:
+            print("...ENTER A NUMBER!")
+    dnErr = _deleteNote(notes, l)
+    if dnErr == 0:
+        print("...note was not deleted")
+    else:
+        print("note deleted...")
+
+def changeHandle():
+    for i in range(len(notes)):
+        print(i, end='')
+        showNote(notes[i])
+        
+    while True:
+        try:
+            nNum = int(input("which note do you wanna change? "))
+            break
+        except:
+            print("...ENTER A NUMBER!")
+
+    tmp = input("new note: ")
+    note = []
+    note.append(tmp)
+    while True:
+        tmp = input()
+        if tmp == '':
+            break
+        note.append(tmp)
+    
+    cnErr = _changeNote(user, key, notes, nNum, note)
+    if not cnErr:
+        print("...couldn't change note")
+    else:
+        print("note changed...")
+
+def labelHandle():
+    labels = readFile(user, key, True)
+    if labels:
+        print("labels:")
+        print(labels)
+    else:
+        print("No labels yet...")
+    label = input("label name: ")
+    isIn = True
+    while True and isIn:
+        isl = input("do you wanna also add it to a note?(y/n/q(uit)) ")
+        lNumL = []
+        if isl.lower() == 'y':
+            for i in range(len(notes)):
+                print(i, end='')
+                showNote(notes[i])
+
+            while True:
+                tmp = input("note number(q to exit): ")
+                if tmp.lower() == 'q':
+                    isIn = False
+                    break   
+                lNumL.append(int(tmp))
+            for ln in lNumL:
+                addlabelToFile(user, key, label)
+                _addlabel(user, key, notes, ln, notes[ln]["note"], label)
+        elif isl.lower() == 'n':
+            if strIsInFile(getUserFiles(user, False, True)[1], key, label) > 0:
+                print("already exists...")
+                break
+            addlabelToFile(user, key, label)
+            print("new label created...")
+            break
+        elif isl.lower() == 'q':
+            break       
+
+
+def optionHandle(opt, options):
+    if opt == options[5]:
+        return 0
+    if opt == options[0]:
+        viewHandle()
+
+    if opt == options[3]:
+        addHandle()
+
+    if opt == options[2]:
+        deleteHandle()
+        
+    if opt == options[1]:
+        changeHandle()
+            
+    if opt == options[4]:
+        labelHandle()
 
 ls = input("login(l)/signUp(s): ")
 F = True
@@ -280,136 +428,29 @@ while F:
     else:
         ls = input("login(l)/signUp(s): ")
 
-cmdList = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
-cmd = 0
+options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
+opt = 0
 F = True
+flags = [None, "options", "less"]
+flag = flags[0]
 while F:
-    if cmd != 0:
+    if opt != 0:
         tmp = input("press ENTER to proceed...")
-            
-    cmd = inquirer.list_input("Options:", choices=cmdList)
 
-    if cmd == cmdList[5]:
-        F = False
-    if cmd == cmdList[0]:
-        notes = readNotes(user, key)
-        if len(notes) == 0:
-            print("no notes yet...")
-        else:
-            llabels = readFile(user, key, True)
-            if not llabels:
-                print("no labels yet...")
-            else:
-                print("labels: ")
-                print(llabels)
+    cmd = input("$ ")
+    if cmd == "options" or cmd == "opts":
+        flag = flags[1]
+    elif cmd == "less":
+        flag = flags[2]
 
-            which = input("wich notes(label name / all): ")
-            if which == 'all':
-                for note in notes:
-                    showNote(note)
-            else:
-                chosenNotes = seeNoteBylabel(user, key, [which])
-                if len(chosenNotes) == 0:
-                    print("no note with such label...")
-                else:
-                    for note in chosenNotes:
-                        showNote(note)
+    if flag == flags[2]:
+        curses.wrapper(less)
+        flag = flags[0]
+    elif flag == flags[1]:    
+        opt = inquirer.list_input("Options:", choices=options)
 
-    if cmd == cmdList[3]:
-        tmp = input("add thy note: ")
-        n = []
-        n.append(tmp)
-        while True:
-            tmp = input()
-            if tmp == '':
-                break
-            n.append(tmp)
-        _addNote(user, key, notes, n)
-        lab = input("label(press enter if no labels): ")
-        if len(lab) == 0:
-            lab = None
-        else:
-            addlabelToFile(user, key, lab)
-            _addlabel(user, key, notes, len(notes) - 1, notes[len(notes) - 1]["note"], lab)
+        if optionHandle(opt, options) == 0:
 
-    if cmd == cmdList[2]:
-        noteList = readNotes(user, key)
-        for i in range(len(noteList)):
-            print(i, end='')
-            showNote(notes[i])
-        
-        while True:
-            try:
-                l = int(input("which note do you want to delete? "))
-                break
-            except:
-                print("...ENTER A NUMBER!")
-        notes = _deleteNote(notes, l)
-        if notes == 0:
-            print("...note was not deleted")
-        else:
-            print("note deleted...")
-        
-    if cmd == cmdList[1]:
-        for i in range(len(notes)):
-            print(i, end='')
-            showNote(notes[i])
-        
-        while True:
-            try:
-                nNum = int(input("which note do you wanna change? "))
-                break
-            except:
-                print("...ENTER A NUMBER!")
-
-        tmp = input("new note: ")
-        note = []
-        note.append(tmp)
-        while True:
-            tmp = input()
-            if tmp == '':
-                break
-            note.append(tmp)
-        
-        cnErr = _changeNote(user, key, notes, nNum, note)
-        if not cnErr:
-            print("...couldn't change note")
-        else:
-            print("note changed...")
-            
-    if cmd == cmdList[4]:
-        labels = readFile(user, key, True)
-        if labels:
-            print("labels:")
-            print(labels)
-        else:
-            print("No labels yet...")
-        label = input("label name: ")
-        isIn = True
-        while True and isIn:
-            isl = input("do you wanna also add it to a note?(y/n/q(uit)) ")
-            lNumL = []
-            if isl.lower() == 'y':
-                for i in range(len(notes)):
-                    print(i, end='')
-                    showNote(notes[i])
-
-                while True:
-                    tmp = input("note number(q to exit): ")
-                    if tmp.lower() == 'q':
-                        isIn = False
-                        break   
-                    lNumL.append(int(tmp))
-                for ln in lNumL:
-                    addlabelToFile(user, key, label)
-                    _addlabel(user, key, notes, ln, notes[ln]["note"], label)
-            elif isl.lower() == 'n':
-                if strIsInFile(getUserFiles(user, False, True)[1], key, label) > 0:
-                    print("already exists...")
-                    break
-                addlabelToFile(user, key, label)
-                print("new label created...")
-                break
-            elif isl.lower() == 'q':
-                break       
+            break
+        flag = flags[0]
         
