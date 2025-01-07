@@ -29,21 +29,22 @@ def less(stdscr):
     pad.move(0, 0)
     stdscr.refresh()
     helpBar.refresh()
-    lineCtr = 0
-    for i in range(len(notes)):
-        tmp = str(i) + ': '
-        if notes[i]["label"]:
-            tmp += '(' + notes[i]['label'] + ') '
-        lineCount = len(notes[i]["note"])
-        lineCtr += lineCount
-        for ln in range(lineCount):
-            if ln == lineCount - 1:
-                tmp += notes[i]["note"][ln]
-                break
-            tmp += notes[i]["note"][ln] + '\n'
-        tmp += ' (' + notes[i]["timeStamp"] + ')\n'
-        pad.addstr(tmp)
-        pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
+    # lineCtr = 0
+    # for i in range(len(notes)):
+    #     tmp = str(i) + ': '
+    #     if notes[i]["label"]:
+    #         tmp += '(' + notes[i]['label'] + ') '
+    #     lineCount = len(notes[i]["note"])
+    #     lineCtr += lineCount
+    #     for ln in range(lineCount):
+    #         if ln == lineCount - 1:
+    #             tmp += notes[i]["note"][ln]
+    #             break
+    #         tmp += notes[i]["note"][ln] + '\n'
+    #     tmp += ' (' + notes[i]["timeStamp"] + ')\n'
+    lineCtr, tmp = xtrctNote(notes)
+    pad.addstr(tmp)
+    pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
     line = 0
     stdscr.nodelay(True)
     while True:
@@ -65,7 +66,7 @@ def less(stdscr):
                 line += curses.LINES - hBars
         elif key == 'p':
             if line - curses.LINES > 1:
-                line -= curses.LINES
+                line -= curses.LINES - hBars
             else:
                 line = 0 
             
@@ -259,11 +260,9 @@ def _addlabel(user, key, notes, idx, note, label):
     except:
         return 1
 
-def readFile(u, key, islabel: bool):
-    if not islabel:
-        tmp = getUserFiles(u, True, False)[0]
-    else:
-        tmp = getUserFiles(u, False, True)[1]
+# string of labels: there is a label file / False: there isn'n a label file
+def xtrctLable(u, key):
+    tmp = getUserFiles(u, False, True)[1]
 
     exits = os.path.isfile(tmp)
     if exits:
@@ -274,6 +273,25 @@ def readFile(u, key, islabel: bool):
         encryptFile(tmp, key)
         return lines
     return False
+
+# [total line count, string of content]
+def xtrctNote(noteList):
+    lineCtr = 0
+    sNotes = ''
+    for i in range(len(noteList)):
+        tmp = str(i) + ': '
+        if noteList[i]["label"]:
+            tmp += '(' + noteList[i]['label'] + ') '
+        lineCount = len(noteList[i]["note"])
+        lineCtr += lineCount
+        for ln in range(lineCount):
+            if ln == lineCount - 1:
+                tmp += noteList[i]["note"][ln]
+                break
+            tmp += noteList[i]["note"][ln] + '\n'
+        tmp += ' (' + noteList[i]["timeStamp"] + ')\n'
+        sNotes += tmp
+    return [lineCtr, sNotes]
 
 def addlabelToFile(u, key, label):
     # tmp = u + "labels.txt"
@@ -330,7 +348,7 @@ def viewHandle():
     if len(notes) == 0:
         print("no notes yet...")
     else:
-        llabels = readFile(user, key, True)
+        llabels = xtrctLable(user, key)
         if not llabels:
             print("no labels yet...")
         else:
@@ -339,15 +357,13 @@ def viewHandle():
 
         which = input("wich notes(label name / all): ")
         if which == 'all':
-            for note in notes:
-                showNote(note)
+            print(xtrctNote(notes)[1])
         else:
             chosenNotes = seeNoteBylabel(user, key, [which])
             if len(chosenNotes) == 0:
                 print("no note with such label...")
             else:
-                for note in chosenNotes:
-                    showNote(note)
+                print(xtrctNote(chosenNotes)[1])
 
 def addHandle():
     tmp = input("add thy note: ")
@@ -411,7 +427,7 @@ def changeHandle():
         print("note changed...")
 
 def labelHandle():
-    labels = readFile(user, key, True)
+    labels = xtrctLable(user, key)
     if labels:
         print("labels:")
         print(labels)
@@ -423,9 +439,10 @@ def labelHandle():
         isl = input("do you wanna also add it to a note?(y/n/q(uit)) ")
         lNumL = []
         if isl.lower() == 'y':
-            for i in range(len(notes)):
-                print(i, end='')
-                showNote(notes[i])
+            print(xtrctNote(notes)[1])
+            # for i in range(len(notes)):
+            #     print(i, end='')
+            #     showNote(notes[i])
 
             while True:
                 tmp = input("note number(q to exit): ")
@@ -495,8 +512,6 @@ flags = [None, "options", "less", "view", "del", "add", "ch", "lb", "q", "clear"
 flag = flags[0]
 while F:
     flag = flags[0]
-    if opt != 0:
-        tmp = input("press ENTER to proceed...")
 
     cmd = input("$ ")
     if cmd == "options" or cmd == "opts":
