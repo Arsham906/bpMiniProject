@@ -10,8 +10,56 @@ PROFILE = "profile.txt"
 
 def less(stdscr):
     stdscr.clear()
-    stdscr.addstr("notes...")
+    stdscr.addstr("notes...\n")
+    
+    helpBar = curses.newwin(1, curses.COLS - 1, curses.LINES - 1, 0)
+    helpBar.refresh()
+    helpBar.addstr("nextPage(n), previousPage(p), dow(s), up(w), quit(q)")
+    pad = curses.newpad(1000, 1000)
     stdscr.refresh()
+    helpBar.refresh()
+    lineCtr = 0
+    for i in range(len(notes)):
+        tmp = str(i) + ': '
+        if notes[i]["label"]:
+            tmp += '(' + notes[i]['label'] + ') '
+        lineCount = len(notes[i]["note"])
+        lineCtr += lineCount
+        for ln in range(lineCount):
+            if ln == lineCount - 1:
+                tmp += notes[i]["note"][ln]
+                break
+            tmp += notes[i]["note"][ln] + '\n'
+        tmp += ' (' + notes[i]["timeStamp"] + ')\n'
+        pad.addstr(tmp)
+        pad.refresh(0, 0, 0, 0, curses.LINES - 2, curses.COLS - 1)
+    line = 0
+    stdscr.nodelay(True)
+    while True:
+        try:
+            key = stdscr.getkey()
+        except:
+            key = None
+
+        if key == 's':
+            if line + curses.LINES - 10 <= lineCtr:
+                line += 1
+        elif key == 'w':
+            if line > 1:
+                line -= 1
+        elif key == "q":
+            break
+        elif key == 'n':
+            if line + curses.LINES <= lineCtr:
+                line += curses.LINES
+        elif key == 'p':
+            if line - curses.LINES > 1:
+                line -= curses.LINES
+            else:
+                line = 0 
+            
+        pad.refresh(line, 0, 0, 0, curses.LINES - 2, curses.COLS - 1)                
+
     stdscr.getch()
 
 def encryptFile(path, key):
@@ -68,6 +116,7 @@ def login(u, p):
         
     return -1
 
+# notes: success / empty list: failure
 def readNotes(user, key):
     path = getUserFiles(user, True, False)[0]
     try:
@@ -431,9 +480,10 @@ while F:
 options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
 opt = 0
 F = True
-flags = [None, "options", "less"]
+flags = [None, "options", "less", "view", "del", "add", "ch", "lb", "q"]
 flag = flags[0]
 while F:
+    flag = flags[0]
     if opt != 0:
         tmp = input("press ENTER to proceed...")
 
@@ -442,15 +492,36 @@ while F:
         flag = flags[1]
     elif cmd == "less":
         flag = flags[2]
+    elif cmd == "view":
+        flag = flags[3]
+    elif cmd == "del":
+        flag = flags[4]
+    elif cmd == "add":
+        flag = flags[5]
+    elif cmd == "ch":
+        flag = flags[6]
+    elif cmd == "lb":
+        flag = flags[7]
+    elif cmd == "q":
+        flag = flags[8]
 
     if flag == flags[2]:
         curses.wrapper(less)
-        flag = flags[0]
     elif flag == flags[1]:    
         opt = inquirer.list_input("Options:", choices=options)
 
         if optionHandle(opt, options) == 0:
 
             break
-        flag = flags[0]
-        
+    elif flag == flags[3]:
+        viewHandle()
+    elif flag == flags[4]:
+        deleteHandle()
+    elif flag == flags[5]:
+        addHandle()
+    elif flag == flags[6]:
+        changeHandle()
+    elif flag == flags[7]:
+        labelHandle()
+    elif flag == flags[8]:
+        break
