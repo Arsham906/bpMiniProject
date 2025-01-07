@@ -73,7 +73,11 @@ def less(stdscr):
         lineCtr, tmp = xtrctNote(notes)
     else:
         tmp = xtrctLable(user, key, False)
-        lineCtr = tmp.count('\n')
+        if type(tmp) == str:
+            lineCtr = tmp.count('\n')
+        else:
+            tmp = ''
+            lineCtr = 0
         
     pad.addstr(tmp)
     pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
@@ -543,13 +547,16 @@ def labelHandle():
 
     lNumL = []
     if isl == choic[0]:
-        sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
-        chosenNotes = questionary.checkbox("which notes? ", choices=sn).ask()
-        for note in chosenNotes:
-            lNumL.append(sn.index(note))
-            addlabelToFile(user, key, label)
-            _addlabel(user, key, notes, sn.index(note), notes[sn.index(note)]["note"], label)
+        if len(notes) > 0:
             sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
+            chosenNotes = questionary.checkbox("which notes? ", choices=sn).ask()
+            for note in chosenNotes:
+                lNumL.append(sn.index(note))
+                addlabelToFile(user, key, label)
+                _addlabel(user, key, notes, sn.index(note), notes[sn.index(note)]["note"], label)
+                sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
+        else:
+            print("...no notes yet")
             
     elif isl == choic[1]:
         if strIsInFile(getUserFiles(user, False, True, False)[1], key, label) > 0:
