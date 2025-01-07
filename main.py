@@ -9,6 +9,45 @@ import questionary
 
 PROFILE = "profile.txt"
 isNote = True
+SUMMCOUNT = 10
+SUMMPADD = '.'
+
+# 0: success / -1: failure
+def setConfig(user, key):
+    path = getUserFiles(user, False, False, True)[2]
+    try:
+        decryptFile(path, key)
+    except:
+        if not os.path.isdir(user.capitalize()):
+            os.mkdir(user.capitalize())
+        f = open(path, 'w')
+        f.close()
+    
+    try:
+        with open(path, 'w') as fw:
+            fw.write('10\n')
+            fw.write(SUMMPADD)
+        encryptFile(path, key)
+        return 0
+    except:
+        return -1
+
+# -2: no such file or bad encryption / -1: failed to read the file / 0: success
+def getConfig(user, key):
+    path = getUserFiles(user, False, False, True)[2]
+    try:
+        # encryptFile(path, key)
+        decryptFile(path, key)
+    except:
+        return -2
+    try:
+        with open(path, 'r') as fr:
+            count = fr.readline()
+            padd = fr.readline()
+        encryptFile(path, key)
+        return [count, padd]
+    except:
+        return -1
 
 def clear():
     operatingSystem = os.sys.platform
@@ -33,7 +72,6 @@ def less(stdscr):
     if isNote:
         lineCtr, tmp = xtrctNote(notes)
     else:
-        global key
         tmp = xtrctLable(user, key, False)
         lineCtr = tmp.count('\n')
         
@@ -43,22 +81,22 @@ def less(stdscr):
     stdscr.nodelay(True)
     while True:
         try:
-            key = stdscr.getkey()
+            keyStrk = stdscr.getkey()
         except:
-            key = None
+            keyStrk = None
 
-        if key == 's':
+        if keyStrk == 's':
             if line + 1 < lineCtr:
                 line += 1
-        elif key == 'w':
+        elif keyStrk == 'w':
             if line > 0:
                 line -= 1
-        elif key == "q":
+        elif keyStrk == "q":
             break
-        elif key == 'n':
+        elif keyStrk == 'n':
             if line + curses.LINES <= lineCtr:
                 line += curses.LINES - hBars
-        elif key == 'p':
+        elif keyStrk == 'p':
             if line - curses.LINES > 1:
                 line -= curses.LINES - hBars
             else:
@@ -84,14 +122,17 @@ def decryptFile(path, key):
     with open(path, 'wb') as fw:
         fw.write(dCon)
 
-def getUserFiles(u, notes: bool, label: bool):
+def getUserFiles(u, notes: bool, label: bool, config: bool):
     tmpN = ''
     tmpL = ''
+    tmpC = ''
     if notes:
         tmpN = u.capitalize() + '/' + u + '.txt'
     if label:
         tmpL = u.capitalize() + '/' + u + 'label.txt'
-    return [tmpN, tmpL]
+    if config:
+        tmpC += u.capitalize() + '/' + u + 'config.txt'
+    return [tmpN, tmpL, tmpC]
 
 def isInteger(s):
     for c in s:
@@ -124,7 +165,7 @@ def login(u, p):
 
 # notes: success / empty list: failure
 def readNotes(user, key):
-    path = getUserFiles(user, True, False)[0]
+    path = getUserFiles(user, True, False, False)[0]
     try:
         decryptFile(path, key)
     except:
@@ -145,7 +186,7 @@ def readNotes(user, key):
 
 # new list of notes: success / 0: faliure
 def _addNote(user, key, notes: list, note: str, label = None):
-    path = getUserFiles(user, True, False)[0]
+    path = getUserFiles(user, True, False, False)[0]
     try:
         decryptFile(path, key)
     except:
@@ -168,7 +209,7 @@ def _addNote(user, key, notes: list, note: str, label = None):
         return 0
     
 def seeNoteBylabel(user, key, label: list):
-    path = getUserFiles(user, True, False)[0]
+    path = getUserFiles(user, True, False, False)[0]
     try:
         decryptFile(path, key)
     except:
@@ -210,7 +251,7 @@ def showNote(note, timeStamp = True):
 # deleted note: success / 0: failure
 def _deleteNote(notes, idx):
     deletedNote = notes.pop(idx)
-    path = getUserFiles(user, True, False)[0]
+    path = getUserFiles(user, True, False, False)[0]
     try:
         decryptFile(path, key)
     except:
@@ -253,7 +294,7 @@ def _addlabel(user, key, notes, idx, note, label):
 
 # list/string of labels: there is a label file / False: there isn'n a label file
 def xtrctLable(u, key, list = True):
-    tmp = getUserFiles(u, False, True)[1]
+    tmp = getUserFiles(u, False, True, False)[1]
 
     exits = os.path.isfile(tmp)
     if exits:
@@ -293,12 +334,12 @@ def xtrctNote(noteList):
 
 def addlabelToFile(u, key, label):
     # tmp = u + "labels.txt"
-    tmp = getUserFiles(u, False, True)[1]
+    tmp = getUserFiles(u, False, True, False)[1]
     exits = os.path.isfile(tmp)
     if not exits:
         if not os.path.isdir(u.capitalize()):
             os.mkdir(u.capitalize())
-        f = open(getUserFiles(u, False, True)[1], 'w')
+        f = open(getUserFiles(u, False, True, False)[1], 'w')
         encryptFile(tmp, key)
         f.close()
     try:
@@ -324,24 +365,28 @@ def addlabelToFile(u, key, label):
 # -1: no such file / 0: no such string / 1: string found
 def strIsInFile(fileName, key, string):
     try:
-        decryptFile(fileName, key)
+        if key:
+            decryptFile(fileName, key)
         with open(fileName, 'r') as fr:
             lines = fr.readlines()
             for line in lines:
                 r = line.find(string)
                 if r != -1:
-                    encryptFile(fileName, key)
+                    if key:
+                        encryptFile(fileName, key)
                     return 1
-        encryptFile(fileName, key)
+        if key:
+            encryptFile(fileName, key)
         return 0
     except FileNotFoundError:
         try:
-            encryptFile(fileName, key)
+            if key:
+                encryptFile(fileName, key)
         except:
             pass
         return -1
 
-def sumNotes(noteList, nChar = 10, padd = '...', withnum = True):
+def sumNotes(noteList, nChar, padd, withnum = True):
     lSmdNotes = []
     for i in range(len(noteList)):
         chrCnt = 0
@@ -355,12 +400,18 @@ def sumNotes(noteList, nChar = 10, padd = '...', withnum = True):
         for ln in range(lineCount):
             tmpCnt = chrCnt + len(noteList[i]["note"][ln])
             if tmpCnt >= nChar:
-                tmp += noteList[i]["note"][ln][:nChar - chrCnt]
+                if ln == lineCount - 1:
+                    tmp += noteList[i]["note"][ln][:nChar - chrCnt]
+                else:
+                    tmp += noteList[i]["note"][ln][:nChar - chrCnt] + ' '
                 break
             else:
                 chrCnt = tmpCnt
-            tmp += noteList[i]["note"][ln] + ' '
-        tmp += padd + ' (' + noteList[i]["timeStamp"] + ')'
+            if ln == lineCount - 1:
+                tmp += noteList[i]["note"][ln][:nChar - chrCnt]
+            else:
+                tmp += noteList[i]["note"][ln][:nChar - chrCnt] + ' '
+        tmp += padd*3 + ' (' + noteList[i]["timeStamp"] + ')'
         lSmdNotes.append(tmp)
     return lSmdNotes
     
@@ -372,18 +423,23 @@ def viewHandle():
         llabels = xtrctLable(user, key)
         if not llabels:
             print("no labels yet...")
+            choices = ["all", "summarize", "quit"]
         else:
             print("labels: ")
             print(llabels)
-            
-        choices = ["by label", "all", "quit"]
+            choices = ["by label", "all", "summarize", "quit"]
+
         ans = questionary.select("how: ", choices=choices).ask()
         # which = input("wich notes(label name / all): ")
-        if ans == choices[2]:
+        if ans == "quit":
             return 0
-        if ans == choices[1]:
+        if ans == "all":
             print(xtrctNote(notes)[1])
-        elif ans == choices[0]:
+        elif ans == "summarize":
+            sn = sumNotes(notes, SUMMCOUNT, SUMMPADD)
+            for n in sn:
+                print(n)
+        elif ans == "by label":
             which = questionary.checkbox("which labels? ", choices=llabels).ask()
             chosenNotes = seeNoteBylabel(user, key, which)
             if len(chosenNotes) == 0:
@@ -402,9 +458,13 @@ def addHandle():
         n.append(tmp)
     _addNote(user, key, notes, n)
     lLabels = xtrctLable(user, key)
-    lLabels.append("new label")
-    lLabels.append("no labels")
-    lab = questionary.select("wanna add label? ", choices=lLabels).ask()
+    if lLabels == False:
+        print("no labels yet...")
+        lab = questionary.select("wanna add label?", choices=["no labels", "new label"]).ask()
+    else:
+        lLabels.append("new label")
+        lLabels.append("no labels")
+        lab = questionary.select("wanna add label? ", choices=lLabels).ask()
     # lab = input("label(press enter if no labels): ")
     if lab == "no labels":
         lab = None
@@ -422,7 +482,7 @@ def addHandle():
 def deleteHandle():
     # print(xtrctNote(notes)[1])
     l = []
-    sn = sumNotes(notes, withnum=False)
+    sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
     # ln = inquirer.list_input("Notes:", choices=sn)
     ln = questionary.checkbox("Notes:", choices=sn).ask()
     ans = questionary.select("are you sure? ", choices=["yes", "no"]).ask()
@@ -433,14 +493,14 @@ def deleteHandle():
                 print("...note was not deleted")
             else:
                 print("note deleted...")
-            sn = sumNotes(notes, withnum=False)
+            sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
     else:
         print("aborted...")
         pass
 
 def changeHandle():
     print(xtrctNote(notes)[1])
-    sn = sumNotes(notes)
+    sn = sumNotes(notes, SUMMCOUNT, SUMMPADD)
     sn.append("quit")
     ln = questionary.select("Notes:", choices=sn).ask()
     if ln == "quit":
@@ -483,16 +543,16 @@ def labelHandle():
 
     lNumL = []
     if isl == choic[0]:
-        sn = sumNotes(notes, withnum=False)
+        sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
         chosenNotes = questionary.checkbox("which notes? ", choices=sn).ask()
         for note in chosenNotes:
             lNumL.append(sn.index(note))
             addlabelToFile(user, key, label)
             _addlabel(user, key, notes, sn.index(note), notes[sn.index(note)]["note"], label)
-            sn = sumNotes(notes, withnum=False)
+            sn = sumNotes(notes, SUMMCOUNT, SUMMPADD, withnum=False)
             
     elif isl == choic[1]:
-        if strIsInFile(getUserFiles(user, False, True)[1], key, label) > 0:
+        if strIsInFile(getUserFiles(user, False, True, False)[1], key, label) > 0:
             print("already exists...")
         addlabelToFile(user, key, label)
         print("new label created...")
@@ -518,22 +578,29 @@ def optionHandle(opt, options):
     if opt == options[4]:
         labelHandle()
 
-ls = input("login(l)/signUp(s): ")
 F = True
 user = ''
 pas = ''
 
 while F:
+    ls = input("login(l)/signUp(s): ")
     if ls.lower() == 's':
         user = input("username: ")
         pas = getpass("password: ")
+        if strIsInFile(PROFILE, None, user):
+            print("...user already exits")
+            continue
         key = signUp(user, pas)
+        setConfig(user, key)
+        notes = []
         F = False
     elif ls.lower() == 'l':
         user = input("username: ")
         pas = getpass("password: ")
         key = login(user, pas)
         if type(key) == bytes:
+            SUMMCOUNT, SUMMPADD = getConfig(user, key)
+            SUMMCOUNT = int(SUMMCOUNT)
             notes = readNotes(user, key)
             F = False
         else:
@@ -544,7 +611,7 @@ while F:
 options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
 opt = 0
 F = True
-flags = [None, "options", "less n", "less l", "view", "del", "add", "ch", "lb", "q", "clear"]
+flags = [None, "options", "less n", "less l", "view", "del", "add", "ch", "lb", "q", "clear", "setSummCount", "setSummpadd"]
 flag = flags[0]
 while F:
     flag = flags[0]
@@ -570,6 +637,10 @@ while F:
         flag = flags[9]
     elif cmd == "clear":
         flag = flags[10]
+    elif cmd == "setSummCount":
+        flag = flags[11]
+    elif cmd == "setSummPadd":
+        flag = flags[12]
 
     if flag == flags[2]:
         isNote = True
@@ -598,3 +669,17 @@ while F:
         break
     elif flag == flags[10]:
         clear()
+    elif flag == flags[11]:
+        try:
+            tmp = int(input("new summarize count: "))
+            SUMMCOUNT = tmp
+            setConfig(user, key)
+        except:
+            print("...summarize count should be an integer")
+    elif flag == flags[12]:
+        tmp = input("summarize padding: ")
+        if len(tmp) > 1:
+            print("...summarize padding can only be one character")
+        else:
+            SUMMPADD = tmp
+            setConfig(user, key)
