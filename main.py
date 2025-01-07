@@ -5,17 +5,28 @@ import json
 import inquirer
 from getpass import getpass
 import curses
+import subprocess
 
 PROFILE = "profile.txt"
 
+def clear():
+    operatingSystem = os.sys.platform
+    if operatingSystem == 'win32':
+        subprocess.run('cls', shell=True)
+    elif operatingSystem == 'linux' or operatingSystem == 'darwin':
+        subprocess.run('clear', shell=True)
+        
 def less(stdscr):
     stdscr.clear()
     stdscr.addstr("notes...\n")
-    
-    helpBar = curses.newwin(1, curses.COLS - 1, curses.LINES - 1, 0)
+    hBars = 1
+    helpBar = curses.newwin(hBars, curses.COLS - 1, curses.LINES - 1, 0)
     helpBar.refresh()
     helpBar.addstr("nextPage(n), previousPage(p), dow(s), up(w), quit(q)")
     pad = curses.newpad(1000, 1000)
+    for i in range(999):
+        pad.addstr("~\n")
+    pad.move(0, 0)
     stdscr.refresh()
     helpBar.refresh()
     lineCtr = 0
@@ -32,7 +43,7 @@ def less(stdscr):
             tmp += notes[i]["note"][ln] + '\n'
         tmp += ' (' + notes[i]["timeStamp"] + ')\n'
         pad.addstr(tmp)
-        pad.refresh(0, 0, 0, 0, curses.LINES - 2, curses.COLS - 1)
+        pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
     line = 0
     stdscr.nodelay(True)
     while True:
@@ -42,16 +53,16 @@ def less(stdscr):
             key = None
 
         if key == 's':
-            if line + curses.LINES - 10 <= lineCtr:
+            if line + 1 < lineCtr:
                 line += 1
         elif key == 'w':
-            if line > 1:
+            if line > 0:
                 line -= 1
         elif key == "q":
             break
         elif key == 'n':
             if line + curses.LINES <= lineCtr:
-                line += curses.LINES
+                line += curses.LINES - hBars
         elif key == 'p':
             if line - curses.LINES > 1:
                 line -= curses.LINES
@@ -480,7 +491,7 @@ while F:
 options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
 opt = 0
 F = True
-flags = [None, "options", "less", "view", "del", "add", "ch", "lb", "q"]
+flags = [None, "options", "less", "view", "del", "add", "ch", "lb", "q", "clear"]
 flag = flags[0]
 while F:
     flag = flags[0]
@@ -504,6 +515,8 @@ while F:
         flag = flags[7]
     elif cmd == "q":
         flag = flags[8]
+    elif cmd == "clear":
+        flag = flags[9]
 
     if flag == flags[2]:
         curses.wrapper(less)
@@ -525,3 +538,5 @@ while F:
         labelHandle()
     elif flag == flags[8]:
         break
+    elif flag == flags[9]:
+        clear()
