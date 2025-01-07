@@ -2,10 +2,11 @@ import os
 import datetime
 from cryptography.fernet import Fernet
 import json
-import inquirer
+# import inquirer
 from getpass import getpass
 import curses
 import subprocess
+import questionary
 
 PROFILE = "profile.txt"
 
@@ -29,19 +30,6 @@ def less(stdscr):
     pad.move(0, 0)
     stdscr.refresh()
     helpBar.refresh()
-    # lineCtr = 0
-    # for i in range(len(notes)):
-    #     tmp = str(i) + ': '
-    #     if notes[i]["label"]:
-    #         tmp += '(' + notes[i]['label'] + ') '
-    #     lineCount = len(notes[i]["note"])
-    #     lineCtr += lineCount
-    #     for ln in range(lineCount):
-    #         if ln == lineCount - 1:
-    #             tmp += notes[i]["note"][ln]
-    #             break
-    #         tmp += notes[i]["note"][ln] + '\n'
-    #     tmp += ' (' + notes[i]["timeStamp"] + ')\n'
     lineCtr, tmp = xtrctNote(notes)
     pad.addstr(tmp)
     pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
@@ -215,9 +203,6 @@ def showNote(note, timeStamp = True):
 
 # deleted note: success / 0: failure
 def _deleteNote(notes, idx):
-    while idx < len(notes) - 1:
-        notes[idx] = notes[idx + 1]
-        idx += 1
     deletedNote = notes.pop(idx)
     path = getUserFiles(user, True, False)[0]
     try:
@@ -272,7 +257,7 @@ def xtrctLable(u, key, list = True):
             lines = f.readlines()
             lineL = []
             for line in lines:
-                lineL.append(line[:len(line) - 2])
+                lineL.append(line[:len(line) - 1])
             lines = lineL
         else:
             lines = f.read()
@@ -328,7 +313,7 @@ def addlabelToFile(u, key, label):
         print("addlabel ERROR!")
         return -1
         
-    return 0
+    return lExits
 
 # -1: no such file / 0: no such string / 1: string found
 def strIsInFile(fileName, key, string):
@@ -350,11 +335,14 @@ def strIsInFile(fileName, key, string):
             pass
         return -1
 
-def sumNotes(noteList, nChar = 10, padd = '...'):
+def sumNotes(noteList, nChar = 10, padd = '...', withnum = True):
     lSmdNotes = []
     for i in range(len(noteList)):
         chrCnt = 0
-        tmp = str(i) + ': '
+        if withnum:
+            tmp = str(i) + ': '
+        else:
+            tmp = ''
         if noteList[i]["label"]:
             tmp += '(' + noteList[i]['label'] + ') '
         lineCount = len(noteList[i]["note"])
@@ -381,12 +369,17 @@ def viewHandle():
         else:
             print("labels: ")
             print(llabels)
-
-        which = input("wich notes(label name / all): ")
-        if which == 'all':
+            
+        choices = ["by label", "all", "quit"]
+        ans = questionary.select("how: ", choices=choices).ask()
+        # which = input("wich notes(label name / all): ")
+        if ans == choices[2]:
+            return 0
+        if ans == choices[1]:
             print(xtrctNote(notes)[1])
-        else:
-            chosenNotes = seeNoteBylabel(user, key, [which])
+        elif ans == choices[0]:
+            which = questionary.checkbox("which labels? ", choices=llabels).ask()
+            chosenNotes = seeNoteBylabel(user, key, which)
             if len(chosenNotes) == 0:
                 print("no note with such label...")
             else:
@@ -402,40 +395,51 @@ def addHandle():
             break
         n.append(tmp)
     _addNote(user, key, notes, n)
-    lab = input("label(press enter if no labels): ")
-    if len(lab) == 0:
+    lLabels = xtrctLable(user, key)
+    lLabels.append("new label")
+    lLabels.append("no labels")
+    lab = questionary.select("wanna add label? ", choices=lLabels).ask()
+    # lab = input("label(press enter if no labels): ")
+    if lab == "no labels":
         lab = None
+    elif lab == "new label":
+        lab = input("new lable: ")
+        le = addlabelToFile(user, key, lab)
+        _addlabel(user, key, notes, len(notes) - 1, notes[len(notes) - 1]["note"], lab)
+        if le:
+            print("label already exists...")
     else:
         addlabelToFile(user, key, lab)
         _addlabel(user, key, notes, len(notes) - 1, notes[len(notes) - 1]["note"], lab)
+        
 
 def deleteHandle():
-    print(xtrctNote(notes)[1])
-    sn = sumNotes(notes)
-    sn.append("quit")
-    ln = inquirer.list_input("Notes:", choices=sn)
-    if ln == "quit":
-        return 0
-    dnErr = _deleteNote(notes, sn.index(ln))
-    if dnErr == 0:
-        print("...note was not deleted")
+    # print(xtrctNote(notes)[1])
+    l = []
+    sn = sumNotes(notes, withnum=False)
+    # ln = inquirer.list_input("Notes:", choices=sn)
+    ln = questionary.checkbox("Notes:", choices=sn).ask()
+    ans = questionary.select("are you sure? ", choices=["yes", "no"]).ask()
+    if ans == "yes":
+        for e in ln:
+            dnErr = _deleteNote(notes, sn.index(e))
+            if dnErr == 0:
+                print("...note was not deleted")
+            else:
+                print("note deleted...")
+            sn = sumNotes(notes, withnum=False)
     else:
-        print("note deleted...")
+        print("aborted...")
+        pass
 
 def changeHandle():
     print(xtrctNote(notes)[1])
     sn = sumNotes(notes)
     sn.append("quit")
-    ln = inquirer.list_input("Notes:", choices=sn)
+    ln = questionary.select("Notes:", choices=sn).ask()
     if ln == "quit":
+        print("aborted...")
         return 0
-
-    # while True:
-    #     try:
-    #         nNum = int(input("which note do you wanna change? "))
-    #         break
-    #     except:
-    #         print("...ENTER A NUMBER!")
 
     tmp = input("new note: ")
     note = []
@@ -458,7 +462,7 @@ def labelHandle():
     if labels:
         labels.append("new label")
         labels.append("quit")
-        label = inquirer.list_input("Labels:", choices=labels)
+        label = questionary.select("Labels:", choices=labels).ask()
         if label == "quit":
             return 0
     else:
@@ -467,30 +471,28 @@ def labelHandle():
     choic = ['yes', 'no', 'quit']
     if label == 0 or label == "new label":
         label = input("label name: ")
-        isl = inquirer.list_input("Wanna also add it to a note?", choices=choic)
+        isl = questionary.select("Wanna also add it to a note?", choices=choic).ask()
     else:
         isl = choic[0]
+
     lNumL = []
     if isl == choic[0]:
-        for sn in sumNotes(notes):
-            print(sn)
-
-        while True:
-            tmp = input("note number(q to exit): ")
-            if tmp.lower() == 'q':
-                isIn = False
-                break   
-            lNumL.append(int(tmp))
-        for ln in lNumL:
+        sn = sumNotes(notes, withnum=False)
+        chosenNotes = questionary.checkbox("which notes? ", choices=sn).ask()
+        for note in chosenNotes:
+            lNumL.append(sn.index(note))
             addlabelToFile(user, key, label)
-            _addlabel(user, key, notes, ln, notes[ln]["note"], label)
+            _addlabel(user, key, notes, sn.index(note), notes[sn.index(note)]["note"], label)
+            sn = sumNotes(notes, withnum=False)
+            
     elif isl == choic[1]:
         if strIsInFile(getUserFiles(user, False, True)[1], key, label) > 0:
             print("already exists...")
         addlabelToFile(user, key, label)
         print("new label created...")
     elif isl == choic[2]:
-        pass  
+        print("aborted...")
+        return 0
 
 def optionHandle(opt, options):
     if opt == options[5]:
@@ -564,7 +566,8 @@ while F:
     if flag == flags[2]:
         curses.wrapper(less)
     elif flag == flags[1]:    
-        opt = inquirer.list_input("Options:", choices=options)
+        opt = questionary.select("Options:", choices=options).ask()
+        # opt = inquirer.list_input("Options:", choices=options)
 
         if optionHandle(opt, options) == 0:
 
