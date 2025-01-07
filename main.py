@@ -2,13 +2,13 @@ import os
 import datetime
 from cryptography.fernet import Fernet
 import json
-# import inquirer
 from getpass import getpass
 import curses
 import subprocess
 import questionary
 
 PROFILE = "profile.txt"
+isNote = True
 
 def clear():
     operatingSystem = os.sys.platform
@@ -30,7 +30,13 @@ def less(stdscr):
     pad.move(0, 0)
     stdscr.refresh()
     helpBar.refresh()
-    lineCtr, tmp = xtrctNote(notes)
+    if isNote:
+        lineCtr, tmp = xtrctNote(notes)
+    else:
+        global key
+        tmp = xtrctLable(user, key, False)
+        lineCtr = tmp.count('\n')
+        
     pad.addstr(tmp)
     pad.refresh(0, 0, 0, 0, curses.LINES - 1 - hBars, curses.COLS - 1)
     line = 0
@@ -263,7 +269,7 @@ def xtrctLable(u, key, list = True):
             lines = f.read()
         f.close()
         encryptFile(tmp, key)
-        return lineL
+        return lines
     return False
 
 # [total line count, string of content]
@@ -538,7 +544,7 @@ while F:
 options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
 opt = 0
 F = True
-flags = [None, "options", "less", "view", "del", "add", "ch", "lb", "q", "clear"]
+flags = [None, "options", "less n", "less l", "view", "del", "add", "ch", "lb", "q", "clear"]
 flag = flags[0]
 while F:
     flag = flags[0]
@@ -546,24 +552,30 @@ while F:
     cmd = input("$ ")
     if cmd == "options" or cmd == "opts":
         flag = flags[1]
-    elif cmd == "less":
+    elif cmd == "less n":
         flag = flags[2]
-    elif cmd == "view":
+    elif cmd == "less l":
         flag = flags[3]
-    elif cmd == "del":
+    elif cmd == "view":
         flag = flags[4]
-    elif cmd == "add":
+    elif cmd == "del":
         flag = flags[5]
-    elif cmd == "ch":
+    elif cmd == "add":
         flag = flags[6]
-    elif cmd == "lb":
+    elif cmd == "ch":
         flag = flags[7]
-    elif cmd == "q":
+    elif cmd == "lb":
         flag = flags[8]
-    elif cmd == "clear":
+    elif cmd == "q":
         flag = flags[9]
+    elif cmd == "clear":
+        flag = flags[10]
 
     if flag == flags[2]:
+        isNote = True
+        curses.wrapper(less)
+    if flag == flags[3]:
+        isNote = False
         curses.wrapper(less)
     elif flag == flags[1]:    
         opt = questionary.select("Options:", choices=options).ask()
@@ -572,17 +584,17 @@ while F:
         if optionHandle(opt, options) == 0:
 
             break
-    elif flag == flags[3]:
-        viewHandle()
     elif flag == flags[4]:
-        deleteHandle()
+        viewHandle()
     elif flag == flags[5]:
-        addHandle()
+        deleteHandle()
     elif flag == flags[6]:
-        changeHandle()
+        addHandle()
     elif flag == flags[7]:
-        labelHandle()
+        changeHandle()
     elif flag == flags[8]:
-        break
+        labelHandle()
     elif flag == flags[9]:
+        break
+    elif flag == flags[10]:
         clear()
