@@ -167,6 +167,13 @@ def login(u, p):
         
     return -1
 
+def logout():
+    u = ''
+    p = ''
+    notes = []
+    key = ''
+    return [u, p, key, notes]
+
 # notes: success / empty list: failure
 def readNotes(user, key):
     path = getUserFiles(user, True, False, False)[0]
@@ -585,46 +592,54 @@ def optionHandle(opt, options):
     if opt == options[4]:
         labelHandle()
 
-F = True
-user = ''
-pas = ''
+def signHandle():
+    while True:
+        ls = input("login(l)/signUp(s)/quit(q): ")
+        if ls.lower() == 's':
+            user = input("username: ")
+            pas = getpass("password: ")
+            if strIsInFile(PROFILE, None, user):
+                print("...user already exits")
+                continue
+            key = signUp(user, pas)
+            setConfig(user, key)
+            notes = []
+            return [user, pas, key, notes]
+        elif ls.lower() == 'l':
+            user = input("username: ")
+            pas = getpass("password: ")
+            key = login(user, pas)
+            if type(key) == bytes:
+                SUMMCOUNT, SUMMPADD = getConfig(user, key)
+                SUMMCOUNT = int(SUMMCOUNT)
+                notes = readNotes(user, key)
+                return [user, pas, key, notes]
+            else:
+                print("...username/passwrod was wrong")
+        elif ls.lower() == 'q':
+            return [0, 0, 0, 0]
+        # else:
+        #     ls = input("login(l)/signUp(s): ")
 
-while F:
-    ls = input("login(l)/signUp(s): ")
-    if ls.lower() == 's':
-        user = input("username: ")
-        pas = getpass("password: ")
-        if strIsInFile(PROFILE, None, user):
-            print("...user already exits")
-            continue
-        key = signUp(user, pas)
-        setConfig(user, key)
-        notes = []
-        F = False
-    elif ls.lower() == 'l':
-        user = input("username: ")
-        pas = getpass("password: ")
-        key = login(user, pas)
-        if type(key) == bytes:
-            SUMMCOUNT, SUMMPADD = getConfig(user, key)
-            SUMMCOUNT = int(SUMMCOUNT)
-            notes = readNotes(user, key)
-            F = False
-        else:
-            print("...username/passwrod was wrong")
-    else:
-        ls = input("login(l)/signUp(s): ")
+user, pas, key, notes = signHandle()
 
 options = ["view", "change a note", "delete a note", "add a note", "add label", "quite"]
 opt = 0
 F = True
-flags = [None, "options", "less n", "less l", "view", "del", "add", "ch", "lb", "q", "clear", "setSummCount", "setSummpadd"]
-flag = flags[0]
+if user == 0 and pas == 0 and key == 0 and notes == 0:
+    F = False
+flags = [None, "options", "less n", "less l", "view", "del", "add", "ch", "lb", "q", "clear",\
+        "setSummCount", "setSummpadd", "logOut", "help"]
+print("logout(logOut), option menu(opt, options), less notes(less n), less labels(less l)\n" + \
+    "view(view), delete(del), add note(add), add label(lb), change(ch), quit(q)\n" + \
+    "clear(clear), set summarization count(setSummCount), set summarization padding char(setSummPad)\n" + \
+    "help(?)")
 while F:
+    
     flag = flags[0]
 
     cmd = input("$ ")
-    if cmd == "options" or cmd == "opts":
+    if cmd == "options" or cmd == "opt":
         flag = flags[1]
     elif cmd == "less n":
         flag = flags[2]
@@ -648,6 +663,10 @@ while F:
         flag = flags[11]
     elif cmd == "setSummPadd":
         flag = flags[12]
+    elif cmd == "logOut":
+        flag = flags[13]
+    elif cmd == "?":
+        flag = flags[14]
 
     if flag == flags[2]:
         isNote = True
@@ -690,3 +709,13 @@ while F:
         else:
             SUMMPADD = tmp
             setConfig(user, key)
+    elif flag == flags[13]:
+        user, pas, key, notes = logout()
+        user, pas, key, notes = signHandle()
+        if user == 0 and pas == 0 and key == 0 and notes == 0:
+            break
+    elif flag == flags[14]:
+        print("logout(logOut), option menu(opt, options), less notes(less n), less labels(less l)\n" + \
+    "view(view), delete(del), add note(add), add label(lb), change(ch), quit(q)\n" + \
+    "clear(clear), set summarization count(setSummCount), set summarization padding char(setSummPad)\n" + \
+    "help(?)")
