@@ -1,0 +1,24 @@
+_ commands:
+	1. add -> to add a not and perhaps a label
+	2. del n -> to delete a note
+	3. del l -> to delete a label
+	4. ch -> to change a note
+	5. lb -> to make a label, add label to a note or not, change the label of a note
+	6. view -> to view all notes, view notes by label, summarize notes
+	7. less n -> to see all notes in a new screan in case there are lots of em
+	8. less l -> to see all labels in a new screen in case there are lost of em
+	9. setSummCount -> to set the count of characters when summarizing notes (10 by default)
+	10. setSummPad -> to set the padding to use when summarizing notes (. by default and it repeats three times)
+	___ example for summarization: (sampleLabel) sample not... (time the note was created)
+	11. opt or options -> to see options menu
+	12. ? -> to see all the commands and there use
+	13. clear -> to clear the screen
+	14. logout -> to logout?
+	15. q -> to quit
+
+_ a folder for every user
+	user.txt -> contains user's notes
+	userLabel.txt -> contains user's labels
+	userConfig.txt -> contains user's configs
+_ every file is encrypted
+_ every note has a time stamp
